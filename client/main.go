@@ -92,9 +92,6 @@ func ReceiveMessages(connection net.Conn) {
 			panic("Error while receiving a command")
 		}
 
-		// TODO: remove it
-		fmt.Println(body)
-
 		switch command {
 		case COMMAND_RECEIVE_MESSAGE:
 			{

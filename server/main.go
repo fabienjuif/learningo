@@ -19,7 +19,6 @@ const PACKET_BUFFER_SIZE = 2048
 type Client struct {
 	name       string
 	connection net.Conn
-	ch         chan string
 }
 
 var clientMaps = SafeMap[string, Client]{v: make(map[string]*Client)}
@@ -66,7 +65,6 @@ func processClient(connection net.Conn) {
 				if client != nil {
 					clientMaps.Del(client.name)
 					fmt.Printf("Client has disconnected: %s\n", client.name)
-					close(client.ch)
 					return
 				}
 			}
@@ -79,7 +77,7 @@ func processClient(connection net.Conn) {
 			{
 				fmt.Printf("\t- [%s]: %s\n", COMMAND_SET_NAME, body[0])
 				name := body[0]
-				client = &Client{name, connection, make(chan string)}
+				client = &Client{name, connection}
 				_, err := clientMaps.Add(name, client)
 				if err != nil {
 					return
@@ -88,12 +86,18 @@ func processClient(connection net.Conn) {
 			}
 		case COMMAND_SEND_MESSAGE:
 			{
-				fmt.Printf("\t- [%s]: %s -> %s @%s\n", COMMAND_SEND_MESSAGE, body[0], body[1], body[2])
-				// FIXME: remove it this is just a test
-				err := Send(client.connection, []string{COMMAND_RECEIVE_MESSAGE, "Amrit", body[1], body[2]})
-				if err != nil {
-					panic(err.Error())
-				}
+				fmt.Printf("\t- [%s]: %s <- %s @%s\n", COMMAND_SEND_MESSAGE, body[0], body[1], body[2])
+				go func() {
+					dest := clientMaps.Get(body[0])
+					if dest == nil {
+						fmt.Printf("Client not found: %s\n", body[0])
+						return
+					}
+					err := Send(dest.connection, []string{COMMAND_RECEIVE_MESSAGE, client.name, body[1], body[2]})
+					if err != nil {
+						fmt.Println("Error while sending message", err.Error())
+					}
+				}()
 			}
 		default:
 			panic("Unknown command received:" + command)
