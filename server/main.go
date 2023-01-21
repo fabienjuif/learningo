@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -54,11 +55,20 @@ func main() {
 }
 
 func processClient(connection net.Conn) {
-	client := Client{connection: connection}
+	defer connection.Close()
+	var client *Client
 
 	for {
 		command, body, err := ReadCommand(connection)
 		if err != nil {
+			if err == io.EOF {
+				if client != nil {
+					clientMaps.Del(client.name)
+					fmt.Printf("Client has disconnected: %s\n", client.name)
+					close(client.ch)
+					return
+				}
+			}
 			fmt.Println("Error while reading a command:", err.Error())
 			panic("Error while receiving a command")
 		}
@@ -67,9 +77,16 @@ func processClient(connection net.Conn) {
 		case COMMAND_SET_NAME:
 			{
 				fmt.Printf("\t- [%s]: %s\n", COMMAND_SET_NAME, body[0])
-				client.name = body[0]
-				client.ch = make(chan string)
-				clientMaps.Add(client.name, &client)
+				name := body[0]
+				client = &Client{name, connection, make(chan string)}
+				_, err := clientMaps.Add(name, client)
+				if err != nil {
+					return
+				}
+			}
+		case COMMAND_SEND_MESSAGE:
+			{
+				fmt.Printf("\t- [%s]: %s -> %s\n", COMMAND_SEND_MESSAGE, body[0], body[1])
 			}
 		default:
 			panic("Unknown command received:" + command)
@@ -86,7 +103,6 @@ func processClient(connection net.Conn) {
 	if err != nil {
 		panic("Error while sending a message")
 	}
-	connection.Close()
 }
 
 // TODO: should be in a shared module
@@ -100,6 +116,7 @@ func getEnvOrPanic(key string) string {
 
 // TODO: should be in a shared module
 const COMMAND_SET_NAME = "SET_NAME"
+const COMMAND_SEND_MESSAGE = "SEND_MESSAGE"
 
 // returns the command name, the associated values and an error.
 // TODO: should be in a shared module
@@ -154,11 +171,15 @@ type SafeMap[K comparable, V interface{}] struct {
 	v  map[K]*V
 }
 
-func (safeMap *SafeMap[K, V]) Add(key K, value *V) *V {
+func (safeMap *SafeMap[K, V]) Add(key K, value *V) (*V, error) {
 	safeMap.mu.Lock()
 	defer safeMap.mu.Unlock()
+	_, exists := safeMap.v[key]
+	if exists {
+		return nil, &SafeMapAlreadyExistsError{}
+	}
 	safeMap.v[key] = value
-	return value
+	return value, nil
 }
 
 func (safeMap *SafeMap[K, V]) Get(key K) *V {
@@ -171,4 +192,10 @@ func (safeMap *SafeMap[K, V]) Del(key K) {
 	safeMap.mu.Lock()
 	defer safeMap.mu.Unlock()
 	delete(safeMap.v, key)
+}
+
+type SafeMapAlreadyExistsError struct{}
+
+func (m *SafeMapAlreadyExistsError) Error() string {
+	return "Key already exists"
 }
