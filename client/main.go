@@ -76,55 +76,17 @@ func main() {
 }
 
 func SendMessage(connection net.Conn, dest string, message string) error {
-	err := SendWithAck(connection, []byte("3"))
-	if err != nil {
-		return err
-	}
-	err = SendWithAck(connection, []byte(COMMAND_SEND_MESSAGE))
-	if err != nil {
-		return err
-	}
-	err = SendWithAck(connection, []byte(dest))
-	if err != nil {
-		return err
-	}
-	err = SendWithAck(connection, []byte(message))
-	if err != nil {
-		return err
-	}
-	err = SendWithAck(connection, []byte(strconv.FormatInt(time.Now().UnixMilli(), 10)))
-	if err != nil {
-		return err
-	}
-	return nil
+	return Send(connection, []string{COMMAND_SEND_MESSAGE, dest, message, strconv.FormatInt(time.Now().UnixMilli(), 10)})
 }
 
 func SendSetName(connection net.Conn, name string) error {
-	err := SendWithAck(connection, []byte("1"))
-	if err != nil {
-		return err
-	}
-	err = SendWithAck(connection, []byte(COMMAND_SET_NAME))
-	if err != nil {
-		return err
-	}
-	err = SendWithAck(connection, []byte(name))
-	if err != nil {
-		return err
-	}
-	return nil
+	return Send(connection, []string{COMMAND_SET_NAME, name})
 }
 
-func SendWithAck(connection net.Conn, bytes []byte) error {
-	_, err := connection.Write(bytes)
-	if err != nil {
-		return err
-	}
-	_, err = connection.Read(make([]byte, 1))
-	if err != nil {
-		return err
-	}
-	return nil
+func Send(connection net.Conn, parts []string) error {
+	_, err := connection.Write([]byte(strings.Join(parts, "%part%\n") + "%end%\n"))
+
+	return err
 }
 
 // TODO: should be in a shared module

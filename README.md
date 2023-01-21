@@ -5,12 +5,10 @@ I am sure there is a lot of cool lib out there, I might want to try a 0mq implem
 
 Here is the communication interface chosen for this exercice:
 
-1. The client send the number of `line` it will be sending
-2. Then the client send the command name
-3. Then the command value for each `line`
-4. One line can not exceed 1024 bytes
+1. The client send the number of `parts` it will be sending
+2. `parts` are separated with character `%part%\n`
+3. A message finished uppon receiving `%end%\n`
 5. Only strings can be exchanged
-6. On each step, the server send an acknowledgment packet of 1 byte
 
 Example 1:
 

@@ -6,7 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
-	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/joho/godotenv"
@@ -14,6 +14,7 @@ import (
 
 // TODO: should be share in a lib
 const BUFFER_SIZE = 1024
+const PACKET_BUFFER_SIZE = 2048
 
 type Client struct {
 	name       string
@@ -122,47 +123,18 @@ const COMMAND_SEND_MESSAGE = "SEND_MESSAGE"
 // TODO: should be in a shared module
 func ReadCommand(connection net.Conn) (string, []string, error) {
 	buffer := make([]byte, BUFFER_SIZE)
+	message := ""
 
-	readLine := func() (string, error) {
+	for !strings.HasSuffix(message, "%end%\n") {
 		mLen, err := connection.Read(buffer)
 		if err != nil {
 			fmt.Println("Error reading:", err.Error())
-			return "", err
-		}
-		// -- ack
-		_, err = connection.Write(make([]byte, 1))
-		if err != nil {
-			panic(err)
-		}
-
-		return string(buffer[:mLen]), nil
-	}
-
-	// - number of lines
-	linesStr, err := readLine()
-	if err != nil {
-		return "", nil, err
-	}
-	lines, err := strconv.Atoi(linesStr)
-	if err != nil {
-		return "", nil, err
-	}
-	// - command
-	command, err := readLine()
-	if err != nil {
-		return "", nil, err
-	}
-	// - body
-	body := make([]string, lines)
-	for i := 0; i < lines; i++ {
-		bodyLine, err := readLine()
-		if err != nil {
 			return "", nil, err
 		}
-		body[i] = bodyLine
+		message += string(buffer[:mLen])
 	}
-
-	return command, body, nil
+	split := strings.Split(strings.TrimSuffix(message, "%end%\n"), "%part%\n")
+	return split[0], split[1:], nil
 }
 
 // TODO: it should exist a lib doing this better
