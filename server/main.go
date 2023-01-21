@@ -84,25 +84,20 @@ func processClient(connection net.Conn) {
 				if err != nil {
 					return
 				}
+
 			}
 		case COMMAND_SEND_MESSAGE:
 			{
 				fmt.Printf("\t- [%s]: %s -> %s @%s\n", COMMAND_SEND_MESSAGE, body[0], body[1], body[2])
+				// FIXME: remove it this is just a test
+				err := Send(client.connection, []string{COMMAND_RECEIVE_MESSAGE, "Amrit", body[1], body[2]})
+				if err != nil {
+					panic(err.Error())
+				}
 			}
 		default:
 			panic("Unknown command received:" + command)
 		}
-	}
-
-	buffer := make([]byte, BUFFER_SIZE)
-	mLen, err := connection.Read(buffer)
-	if err != nil {
-		fmt.Println("Error reading:", err.Error())
-	}
-	fmt.Println("Received: ", string(buffer[:mLen]))
-	_, err = connection.Write([]byte("Thanks! Got your message:" + string(buffer[:mLen])))
-	if err != nil {
-		panic("Error while sending a message")
 	}
 }
 
@@ -118,6 +113,7 @@ func getEnvOrPanic(key string) string {
 // TODO: should be in a shared module
 const COMMAND_SET_NAME = "SET_NAME"
 const COMMAND_SEND_MESSAGE = "SEND_MESSAGE"
+const COMMAND_RECEIVE_MESSAGE = "RECEIVE_MESSAGE"
 
 // returns the command name, the associated values and an error.
 // TODO: should be in a shared module
@@ -135,6 +131,13 @@ func ReadCommand(connection net.Conn) (string, []string, error) {
 	}
 	split := strings.Split(strings.TrimSuffix(message, "%end%\n"), "%part%\n")
 	return split[0], split[1:], nil
+}
+
+// TODO: should be in a shared module
+func Send(connection net.Conn, parts []string) error {
+	_, err := connection.Write([]byte(strings.Join(parts, "%part%\n") + "%end%\n"))
+
+	return err
 }
 
 // TODO: it should exist a lib doing this better

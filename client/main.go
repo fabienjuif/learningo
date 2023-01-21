@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -18,6 +19,7 @@ const BUFFER_SIZE = 1024
 // TODO: should be in a shared module
 const COMMAND_SET_NAME = "SET_NAME"
 const COMMAND_SEND_MESSAGE = "SEND_MESSAGE"
+const COMMAND_RECEIVE_MESSAGE = "RECEIVE_MESSAGE"
 
 func main() {
 	// TODO: all this init stuff should be in a shared module
@@ -36,6 +38,9 @@ func main() {
 		panic(err)
 	}
 	defer connection.Close()
+
+	// goroutine to receive messages from server
+	go ReceiveMessages(connection)
 
 	// send some data
 	// - name
@@ -75,6 +80,50 @@ func main() {
 	}
 }
 
+func ReceiveMessages(connection net.Conn) {
+	for {
+		command, body, err := ReadCommand(connection)
+		if err != nil {
+			if err == io.EOF {
+				fmt.Printf("Server has disconnected\n")
+				return
+			}
+			fmt.Println("Error while reading a command:", err.Error())
+			panic("Error while receiving a command")
+		}
+
+		// TODO: remove it
+		fmt.Println(body)
+
+		switch command {
+		case COMMAND_RECEIVE_MESSAGE:
+			{
+				fmt.Printf("\t- [%s]: %s <- %s @%s\n", COMMAND_RECEIVE_MESSAGE, body[1], body[0], body[2])
+			}
+		default:
+			panic("Unknown command received:" + command)
+		}
+	}
+}
+
+// TODO: should be in a shared module
+
+func ReadCommand(connection net.Conn) (string, []string, error) {
+	buffer := make([]byte, BUFFER_SIZE)
+	message := ""
+
+	for !strings.HasSuffix(message, "%end%\n") {
+		mLen, err := connection.Read(buffer)
+		if err != nil {
+			fmt.Println("Error reading:", err.Error())
+			return "", nil, err
+		}
+		message += string(buffer[:mLen])
+	}
+	split := strings.Split(strings.TrimSuffix(message, "%end%\n"), "%part%\n")
+	return split[0], split[1:], nil
+}
+
 func SendMessage(connection net.Conn, dest string, message string) error {
 	return Send(connection, []string{COMMAND_SEND_MESSAGE, dest, message, strconv.FormatInt(time.Now().UnixMilli(), 10)})
 }
@@ -83,6 +132,7 @@ func SendSetName(connection net.Conn, name string) error {
 	return Send(connection, []string{COMMAND_SET_NAME, name})
 }
 
+// TODO: should be in a shared module
 func Send(connection net.Conn, parts []string) error {
 	_, err := connection.Write([]byte(strings.Join(parts, "%part%\n") + "%end%\n"))
 
