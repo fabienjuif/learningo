@@ -37,6 +37,7 @@ Not that `1674303374741` if the client JS Timestamp
 - socket: https://www.developer.com/languages/intro-socket-programming-go/
 - env var: https://www.geeksforgeeks.org/golang-environment-variables/
 - dotenv: https://github.com/joho/godotenv
+- read the stdin: https://stackoverflow.com/questions/20895552/how-can-i-read-from-standard-input-in-the-console
 
 ## Questions
 

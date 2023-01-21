@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -34,35 +36,55 @@ func main() {
 		panic(err)
 	}
 	defer connection.Close()
-	// buffer := make([]byte, BUFFER_SIZE)
 
 	// send some data
 	// - name
-	err = SendSetName(connection, "Fabien")
+	name, err := readFromStdin("Enter your name: ")
+	if err != nil {
+		panic(err)
+	}
+	err = SendSetName(connection, name)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("Name sent")
-	// - message
-	err = SendMessage(connection, "Coucou Amrit!")
-	if err != nil {
-		panic(err)
+	// - messages
+	// 		/q to quit
+	for {
+		dest, err := readFromStdin("Enter your message dest: ")
+		if err != nil {
+			panic(err)
+		}
+		if dest == "/q" {
+			fmt.Println("Quitting...")
+			return
+		}
+		message, err := readFromStdin("Enter your message: ")
+		if err != nil {
+			panic(err)
+		}
+		if message == "/q" {
+			fmt.Println("Quitting...")
+			return
+		}
+		err = SendMessage(connection, dest, message)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Message sent")
 	}
-	fmt.Println("Message sent")
-
-	// mLen, err := connection.Read()
-	// if err != nil {
-	// 	fmt.Println("Error reading:", err.Error())
-	// }
-	// fmt.Println("Received: ", string(buffer[:mLen]))
 }
 
-func SendMessage(connection net.Conn, message string) error {
-	err := SendWithAck(connection, []byte("2"))
+func SendMessage(connection net.Conn, dest string, message string) error {
+	err := SendWithAck(connection, []byte("3"))
 	if err != nil {
 		return err
 	}
 	err = SendWithAck(connection, []byte(COMMAND_SEND_MESSAGE))
+	if err != nil {
+		return err
+	}
+	err = SendWithAck(connection, []byte(dest))
 	if err != nil {
 		return err
 	}
@@ -112,4 +134,15 @@ func getEnvOrPanic(key string) string {
 		panic(fmt.Sprintf("%s must be defined", key))
 	}
 	return val
+}
+
+func readFromStdin(description string) (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print(description)
+	data, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSuffix(data, "\n"), nil
 }

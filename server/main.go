@@ -86,7 +86,7 @@ func processClient(connection net.Conn) {
 			}
 		case COMMAND_SEND_MESSAGE:
 			{
-				fmt.Printf("\t- [%s]: %s -> %s\n", COMMAND_SEND_MESSAGE, body[0], body[1])
+				fmt.Printf("\t- [%s]: %s -> %s @%s\n", COMMAND_SEND_MESSAGE, body[0], body[1], body[2])
 			}
 		default:
 			panic("Unknown command received:" + command)
