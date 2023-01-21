@@ -13,19 +13,13 @@ Here is the communication interface chosen for this exercice:
 Example 1:
 
 ```
-1
-SET_NAME
-Fabien
+SET_NAME%part%\nFabien%end%\n
 ```
 
 Example 2:
 
 ```
-3
-MESSAGE
-Amrit
-how are you?
-1674303374741
+SEND_MESSAGE%part%\nAmrit%part%\nhow are you?%part%\n1674303374741%end%\n
 ```
 
 Not that `1674303374741` if the client JS Timestamp
