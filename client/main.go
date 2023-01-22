@@ -1,25 +1,17 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/joho/godotenv"
+
+	"github.com/fabienjuif/learningo/libs/com"
+	"github.com/fabienjuif/learningo/libs/env"
+	"github.com/fabienjuif/learningo/libs/utils"
 )
-
-// TODO: should be share in a lib
-const BUFFER_SIZE = 1024
-
-// TODO: should be in a shared module
-const COMMAND_SET_NAME = "SET_NAME"
-const COMMAND_SEND_MESSAGE = "SEND_MESSAGE"
-const COMMAND_RECEIVE_MESSAGE = "RECEIVE_MESSAGE"
 
 func main() {
 	// TODO: all this init stuff should be in a shared module
@@ -28,9 +20,9 @@ func main() {
 	if err != nil {
 		panic("Error loading .env file")
 	}
-	serverHost := getEnvOrPanic("SERVER_HOST")
-	serverPort := getEnvOrPanic("SERVER_PORT")
-	serverType := getEnvOrPanic("SERVER_TYPE")
+	serverHost := env.GetEnvOrPanic("SERVER_HOST")
+	serverPort := env.GetEnvOrPanic("SERVER_PORT")
+	serverType := env.GetEnvOrPanic("SERVER_TYPE")
 
 	// establish connection
 	connection, err := net.Dial(serverType, serverHost+":"+serverPort)
@@ -40,15 +32,15 @@ func main() {
 	defer connection.Close()
 
 	// goroutine to receive messages from server
-	go ReceiveMessages(connection)
+	go ListenServer(connection)
 
 	// send some data
 	// - name
-	name, err := readFromStdin("Enter your name: ")
+	name, err := utils.ReadFromStdin("Enter your name: ")
 	if err != nil {
 		panic(err)
 	}
-	err = SendSetName(connection, name)
+	err = com.SendSetName(connection, name)
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +48,7 @@ func main() {
 	// - messages
 	// 		/q to quit
 	for {
-		dest, err := readFromStdin("Enter your message dest: ")
+		dest, err := utils.ReadFromStdin("Enter your message dest: ")
 		if err != nil {
 			panic(err)
 		}
@@ -64,7 +56,7 @@ func main() {
 			fmt.Println("Quitting...")
 			return
 		}
-		message, err := readFromStdin("Enter your message: ")
+		message, err := utils.ReadFromStdin("Enter your message: ")
 		if err != nil {
 			panic(err)
 		}
@@ -72,7 +64,7 @@ func main() {
 			fmt.Println("Quitting...")
 			return
 		}
-		err = SendMessage(connection, dest, message)
+		err = com.SendMessage(connection, dest, message)
 		if err != nil {
 			panic(err)
 		}
@@ -80,9 +72,9 @@ func main() {
 	}
 }
 
-func ReceiveMessages(connection net.Conn) {
+func ListenServer(connection net.Conn) {
 	for {
-		command, body, err := ReadCommand(connection)
+		command, body, err := com.ReadCommand(connection)
 		if err != nil {
 			if err == io.EOF {
 				fmt.Printf("Server has disconnected\n")
@@ -93,9 +85,9 @@ func ReceiveMessages(connection net.Conn) {
 		}
 
 		switch command {
-		case COMMAND_RECEIVE_MESSAGE:
+		case com.COMMAND_RECEIVE_MESSAGE:
 			{
-				fmt.Printf("\t- [%s]: %s <- %s @%s\n", COMMAND_RECEIVE_MESSAGE, body[1], body[0], body[2])
+				fmt.Printf("\t- [%s]: %s <- %s @%s\n", com.COMMAND_RECEIVE_MESSAGE, body[1], body[0], body[2])
 			}
 		default:
 			panic("Unknown command received:" + command)
@@ -103,55 +95,3 @@ func ReceiveMessages(connection net.Conn) {
 	}
 }
 
-// TODO: should be in a shared module
-
-func ReadCommand(connection net.Conn) (string, []string, error) {
-	buffer := make([]byte, BUFFER_SIZE)
-	message := ""
-
-	for !strings.HasSuffix(message, "%end%\n") {
-		mLen, err := connection.Read(buffer)
-		if err != nil {
-			fmt.Println("Error reading:", err.Error())
-			return "", nil, err
-		}
-		message += string(buffer[:mLen])
-	}
-	split := strings.Split(strings.TrimSuffix(message, "%end%\n"), "%part%\n")
-	return split[0], split[1:], nil
-}
-
-func SendMessage(connection net.Conn, dest string, message string) error {
-	return Send(connection, []string{COMMAND_SEND_MESSAGE, dest, message, strconv.FormatInt(time.Now().UnixMilli(), 10)})
-}
-
-func SendSetName(connection net.Conn, name string) error {
-	return Send(connection, []string{COMMAND_SET_NAME, name})
-}
-
-// TODO: should be in a shared module
-func Send(connection net.Conn, parts []string) error {
-	_, err := connection.Write([]byte(strings.Join(parts, "%part%\n") + "%end%\n"))
-
-	return err
-}
-
-// TODO: should be in a shared module
-func getEnvOrPanic(key string) string {
-	val, ok := os.LookupEnv(key)
-	if !ok {
-		panic(fmt.Sprintf("%s must be defined", key))
-	}
-	return val
-}
-
-func readFromStdin(description string) (string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print(description)
-	data, err := reader.ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSuffix(data, "\n"), nil
-}
